@@ -88,10 +88,6 @@ export default function Careers({ appStatus }: { appStatus: AppStatus }) {
   );
 }
 
-import { supabase } from '../lib/supabase';
-
-// ... (keep imports)
-
 function ApplicationForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -102,25 +98,20 @@ function ApplicationForm() {
     setIsSubmitting(true);
 
     try {
-      // 1. Save to Supabase
-      const { error } = await supabase
-        .from('submissions')
-        .insert([{ data: formData }]);
-
-      if (error) throw error;
-
-      // 2. Send to Discord (via server proxy to keep webhook secret)
-      // We still use the server for this part because webhooks shouldn't be exposed to client
-      fetch('/api/submit', {
+      const res = await fetch('/api/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
-      }).catch(console.error); // Fire and forget for Discord
+      });
       
-      setIsSuccess(true);
+      if (res.ok) {
+        setIsSuccess(true);
+      } else {
+        alert('Something went wrong. Please try again.');
+      }
     } catch (error) {
       console.error(error);
-      alert('Error submitting form. Please try again.');
+      alert('Error submitting form.');
     } finally {
       setIsSubmitting(false);
     }
