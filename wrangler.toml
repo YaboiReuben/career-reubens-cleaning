@@ -2,7 +2,10 @@ name = "reubens-cleaning-portal"
 pages_build_output_dir = "dist"
 compatibility_date = "2024-01-01"
 
-[[kv_namespaces]]
-binding = "REUBEN_DB"
-id = "REUBEN_DB_ID" # Replace with your actual KV Namespace ID from Cloudflare Dashboard
-preview_id = "REUBEN_DB_PREVIEW_ID" # Optional: for local development
+# To use KV with Wrangler CLI, uncomment the block below and replace the IDs with your actual KV Namespace IDs from Cloudflare Dashboard.
+# If deploying via Git integration, configure the KV binding in the Cloudflare Dashboard > Settings > Functions > KV Namespace Bindings.
+
+# [[kv_namespaces]]
+# binding = "REUBEN_DB"
+# id = "REUBEN_DB_ID" # Replace with your actual KV Namespace ID
+# preview_id = "REUBEN_DB_PREVIEW_ID" # Optional: for local development
