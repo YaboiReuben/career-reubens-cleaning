@@ -20,6 +20,26 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Startup Check
+(async () => {
+  console.log('----------------------------------------------------------------');
+  console.log('Server Starting...');
+  console.log('Supabase URL:', supabaseUrl ? 'Set' : 'MISSING');
+  console.log('Supabase Key:', supabaseKey ? 'Set' : 'MISSING');
+  
+  try {
+    const { data, error } = await supabase.from('settings').select('count', { count: 'exact', head: true });
+    if (error) {
+      console.error('❌ Supabase Connection Failed:', error.message);
+    } else {
+      console.log('✅ Supabase Connected Successfully!');
+    }
+  } catch (e) {
+    console.error('❌ Supabase Connection Error:', e);
+  }
+  console.log('----------------------------------------------------------------');
+})();
+
 async function startServer() {
   const app = express();
   const PORT = 3000;

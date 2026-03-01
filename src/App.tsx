@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { SprayCan, Menu, X, Lock, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { supabase } from './lib/supabase';
 import Home from './pages/Home';
 import Careers from './pages/Careers';
 
@@ -16,20 +17,65 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   // Fetch initial status
   useEffect(() => {
-    fetch('/api/status')
-      .then(res => res.json())
-      .then(data => setAppStatus(data.status));
+    const fetchStatus = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('settings')
+          .select('value')
+          .eq('key', 'appStatus')
+          .single();
+        
+        if (error) {
+          if (error.code !== 'PGRST116') { // Ignore "row not found"
+            console.error('Supabase error:', error);
+            setConnectionError(error.message);
+          }
+        } else if (data) {
+          setAppStatus(data.value as AppStatus);
+        }
+      } catch (err) {
+        console.error('Connection error:', err);
+        setConnectionError('Failed to connect to database');
+      }
+    };
+
+    fetchStatus();
+
+    // Real-time subscription for status changes
+    const subscription = supabase
+      .channel('settings')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings', filter: 'key=eq.appStatus' }, (payload) => {
+        setAppStatus(payload.new.value as AppStatus);
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Fetch submissions if authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      fetch('/api/submissions')
-        .then(res => res.json())
-        .then(data => setSubmissions(data));
+      const fetchSubmissions = async () => {
+        const { data, error } = await supabase
+          .from('submissions')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (data) {
+          setSubmissions(data.map(row => ({
+            id: row.id,
+            ...row.data,
+            createdAt: row.created_at
+          })));
+        }
+      };
+      fetchSubmissions();
     }
   }, [isAuthenticated]);
 
@@ -55,18 +101,31 @@ export default function App() {
   };
 
   const updateStatus = async (status: AppStatus) => {
-    await fetch('/api/status', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status })
-    });
+    // Optimistic update
     setAppStatus(status);
+    
+    const { error } = await supabase
+      .from('settings')
+      .upsert({ key: 'appStatus', value: status });
+      
+    if (error) {
+      alert('Failed to update status');
+      console.error(error);
+    }
   };
 
   return (
     <Router>
       <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex flex-col">
         <ScrollToTop />
+        
+        {/* Connection Error Banner */}
+        {connectionError && (
+          <div className="bg-red-600 text-white px-4 py-2 text-center text-sm font-medium">
+            Database Connection Error: {connectionError}. Please check your Supabase configuration.
+          </div>
+        )}
+
         {/* Header */}
         <header className="sticky top-0 z-50 bg-white shadow-sm border-b border-slate-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
