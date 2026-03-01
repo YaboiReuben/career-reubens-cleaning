@@ -9,3 +9,7 @@ compatibility_date = "2024-01-01"
 # binding = "REUBEN_DB"
 # id = "REUBEN_DB_ID" # Replace with your actual KV Namespace ID
 # preview_id = "REUBEN_DB_PREVIEW_ID" # Optional: for local development
+
+[vars]
+VITE_SUPABASE_URL = "https://upomdutpizmoranesiax.supabase.co"
+VITE_SUPABASE_ANON_KEY = "sb_publishable_TdOCwT8AMqAaY_2AE8-w2A_Nm_NM5_c"

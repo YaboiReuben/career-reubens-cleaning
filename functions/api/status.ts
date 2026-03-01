@@ -1,11 +1,24 @@
+import { createClient } from '@supabase/supabase-js';
+
 interface Env {
-  REUBEN_DB: KVNamespace;
+  VITE_SUPABASE_URL: string;
+  VITE_SUPABASE_ANON_KEY: string;
 }
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
+  const supabase = createClient(
+    context.env.VITE_SUPABASE_URL,
+    context.env.VITE_SUPABASE_ANON_KEY
+  );
+
   try {
-    const value = await context.env.REUBEN_DB.get("appStatus");
-    return new Response(JSON.stringify({ status: value || 'open' }), {
+    const { data } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'appStatus')
+      .single();
+      
+    return new Response(JSON.stringify({ status: data?.value || 'open' }), {
       headers: { "Content-Type": "application/json" },
     });
   } catch (e) {
@@ -16,11 +29,19 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 }
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
+  const supabase = createClient(
+    context.env.VITE_SUPABASE_URL,
+    context.env.VITE_SUPABASE_ANON_KEY
+  );
+
   try {
     const { status } = await context.request.json() as { status: string };
     
     if (['open', 'closing-soon', 'closed'].includes(status)) {
-      await context.env.REUBEN_DB.put("appStatus", status);
+      await supabase
+        .from('settings')
+        .upsert({ key: 'appStatus', value: status });
+
       return new Response(JSON.stringify({ success: true, status }), {
         headers: { "Content-Type": "application/json" },
       });

@@ -1,36 +1,28 @@
+import { createClient } from '@supabase/supabase-js';
+
 interface Env {
-  REUBEN_DB: KVNamespace;
+  VITE_SUPABASE_URL: string;
+  VITE_SUPABASE_ANON_KEY: string;
 }
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
+  const supabase = createClient(
+    context.env.VITE_SUPABASE_URL,
+    context.env.VITE_SUPABASE_ANON_KEY
+  );
+
   try {
     const formData = await context.request.json() as any;
     
-    // 1. Save to KV (Append to list)
-    // Note: In a high-volume app, this read-modify-write is not race-condition safe.
-    // For a small business hiring form, it's acceptable.
-    let submissions = [];
-    try {
-      const existing = await context.env.REUBEN_DB.get("submissions");
-      if (existing) {
-        submissions = JSON.parse(existing);
-      }
-    } catch (e) {
-      // Ignore error, start empty
+    // 1. Save to Supabase
+    const { error } = await supabase
+      .from('submissions')
+      .insert([{ data: formData }]);
+
+    if (error) {
+      console.error('Supabase Error:', error);
+      return new Response(JSON.stringify({ error: 'Failed to save application' }), { status: 500 });
     }
-
-    const newSubmission = {
-      id: Date.now(),
-      ...formData,
-      createdAt: new Date().toISOString()
-    };
-
-    submissions.unshift(newSubmission); // Add to top
-    
-    // Limit to last 100 submissions to prevent KV size limits
-    if (submissions.length > 100) submissions = submissions.slice(0, 100);
-
-    await context.env.REUBEN_DB.put("submissions", JSON.stringify(submissions));
 
     // 2. Send to Discord
     const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1477532820946686146/sOMw4aJV92Rtxl83Ug03e7ABsJGKLNQI7-116fQNy4UolsJDAoVqTahwoFr3ITll-wUp';
