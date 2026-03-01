@@ -1,30 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
-
-interface Env {
-  VITE_SUPABASE_URL: string;
-  VITE_SUPABASE_ANON_KEY: string;
-}
-
-export const onRequestPost: PagesFunction<Env> = async (context) => {
-  const supabase = createClient(
-    context.env.VITE_SUPABASE_URL,
-    context.env.VITE_SUPABASE_ANON_KEY
-  );
-
+export const onRequestPost: PagesFunction = async (context) => {
   try {
     const formData = await context.request.json() as any;
     
-    // 1. Save to Supabase
-    const { error } = await supabase
-      .from('submissions')
-      .insert([{ data: formData }]);
-
-    if (error) {
-      console.error('Supabase Error:', error);
-      return new Response(JSON.stringify({ error: 'Failed to save application' }), { status: 500 });
-    }
-
-    // 2. Send to Discord
+    // Send to Discord
     const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1477532820946686146/sOMw4aJV92Rtxl83Ug03e7ABsJGKLNQI7-116fQNy4UolsJDAoVqTahwoFr3ITll-wUp';
     
     const embed = {

@@ -2,43 +2,11 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// Supabase Setup
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing Supabase URL or Key');
-  process.exit(1);
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-// Startup Check
-(async () => {
-  console.log('----------------------------------------------------------------');
-  console.log('Server Starting...');
-  console.log('Supabase URL:', supabaseUrl ? 'Set' : 'MISSING');
-  console.log('Supabase Key:', supabaseKey ? 'Set' : 'MISSING');
-  
-  try {
-    const { data, error } = await supabase.from('settings').select('count', { count: 'exact', head: true });
-    if (error) {
-      console.error('❌ Supabase Connection Failed:', error.message);
-    } else {
-      console.log('✅ Supabase Connected Successfully!');
-    }
-  } catch (e) {
-    console.error('❌ Supabase Connection Error:', e);
-  }
-  console.log('----------------------------------------------------------------');
-})();
 
 async function startServer() {
   const app = express();
@@ -48,72 +16,16 @@ async function startServer() {
 
   // API Routes
   
-  // Get Application Status
-  app.get('/api/status', async (req, res) => {
-    const { data, error } = await supabase
-      .from('settings')
-      .select('value')
-      .eq('key', 'appStatus')
-      .single();
-    
-    if (error) {
-      // Ignore "Row not found" error for single()
-      if (error.code === 'PGRST116') {
-        return res.json({ status: 'open' });
-      }
-      
-      console.error('Supabase Error in /api/status:', JSON.stringify(error, null, 2));
-      
-      // Check for missing table error
-      if (error.code === '42P01') {
-        console.error('----------------------------------------------------------------');
-        console.error('CRITICAL: Database tables not found.');
-        console.error('You MUST run the SQL setup script in your Supabase Dashboard.');
-        console.error('See the instructions in the chat.');
-        console.error('----------------------------------------------------------------');
-      }
-    }
-    
-    res.json({ status: data?.value || 'open' });
+  // Get Application Status (Default to open)
+  app.get('/api/status', (req, res) => {
+    res.json({ status: 'open' });
   });
 
-  // Update Application Status
-  app.post('/api/status', async (req, res) => {
-    const { status } = req.body;
-    if (['open', 'closing-soon', 'closed'].includes(status)) {
-      const { error } = await supabase
-        .from('settings')
-        .upsert({ key: 'appStatus', value: status });
-        
-      if (error) {
-        console.error('Supabase Error:', error);
-        return res.status(500).json({ error: 'Failed to update status' });
-      }
-      
-      res.json({ success: true, status });
-    } else {
-      res.status(400).json({ error: 'Invalid status' });
-    }
-  });
-
-  // Submit Application
+  // Submit Application (Discord Only)
   app.post('/api/submit', async (req, res) => {
     const formData = req.body;
     
-    // 1. Save to Supabase
-    const { error } = await supabase
-      .from('submissions')
-      .insert([{ data: formData }]);
-
-    if (error) {
-      console.error('Supabase Error in /api/submit:', JSON.stringify(error, null, 2));
-      if (error.code === '42P01') {
-        return res.status(500).json({ error: 'Database tables missing. Please run SQL setup.' });
-      }
-      return res.status(500).json({ error: 'Failed to save application' });
-    }
-
-    // 2. Send to Discord
+    // Send to Discord
     const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1477532820946686146/sOMw4aJV92Rtxl83Ug03e7ABsJGKLNQI7-116fQNy4UolsJDAoVqTahwoFr3ITll-wUp';
     
     try {
@@ -136,31 +48,12 @@ async function startServer() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ embeds: [embed] })
       });
+      
+      res.json({ success: true });
     } catch (e) {
       console.error('Discord Webhook Error:', e);
+      res.status(500).json({ error: 'Failed to send application' });
     }
-
-    res.json({ success: true });
-  });
-
-  // Get Submissions (Admin)
-  app.get('/api/submissions', async (req, res) => {
-    const { data, error } = await supabase
-      .from('submissions')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Supabase Error in /api/submissions:', JSON.stringify(error, null, 2));
-      return res.status(500).json({ error: 'Failed to fetch submissions' });
-    }
-
-    const submissions = data.map((row: any) => ({
-      id: row.id,
-      ...row.data,
-      createdAt: row.created_at
-    }));
-    res.json(submissions);
   });
 
   // Vite middleware for development
